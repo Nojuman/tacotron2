@@ -1,15 +1,25 @@
 import os
-
+import sys
 import librosa
 import numpy as np
 import pandas as pd
 import torch
 from torch.utils.data import Dataset
+import torch.utils.data as Utils
 from tqdm import tqdm
 
 import hyperparams as hp
 from audio import load_wav, wav_to_spectrogram
 
+import csv
+import matplotlib.pyplot as plt
+from tensorboardX import SummaryWriter
+from IPython.display import clear_output
+import random
+import sys
+import time
+import json
+import seaborn as sns
 
 class LJSpeechDataset(Dataset):
 
@@ -52,6 +62,9 @@ class LJSpeechDataset(Dataset):
         audio, _ = load_wav(f'{self.path}/wavs/{filename}.wav')
         if self.audio_transforms:
             audio = self.audio_transforms(audio)
+            
+        print("TEXT", text)
+        print("AUDIO", audio)
         return text, audio
 
     def __len__(self):
@@ -170,3 +183,173 @@ class RandomBatchSampler:
 
     def __len__(self):
         return len(self.random_batches)
+
+
+
+
+class make_data():
+    """
+    Make all the text and audio data with preprocessing
+    
+    """
+    def __init__(self):
+        self.eos = '~'
+        self.pad = '_'
+        self.chars = self.pad + 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz!\'\"(),-.:;? ' + self.eos
+        self.vocab = self.chars
+        self.unk_idx = len(self.chars)
+
+        self.char_to_id = {char: i for i, char in enumerate(self.chars)}
+        self.id_to_char = {i: char for i, char in enumerate(self.chars)}
+
+
+    def text_to_sequence(self, text):
+        text += self.eos
+        return [self.char_to_id.get(char, self.unk_idx) for char in text]
+
+
+    def sequence_to_text(self, sequence):
+        return "".join(self.id_to_char.get(i, '<unk>') for i in sequence)
+
+
+    def make_text_data(self):
+        text_path = '/home/ubuntu/VCTK-Corpus/txt/'
+        speaker_ids = ['p225', 'p226', 'p227', 'p228', 'p229', 'p225', 'p225', 'p225']
+
+        for ids in speaker_ids:
+
+            text_sorted = sorted((os.listdir(text_path+ids)))
+            new_text_len = []
+            for text_file in text_sorted:
+                with open(text_path + ids + str('/') + text_file, 'r', encoding='utf-8') as infile:
+                    for line in infile:
+                        new_text_len.append(len(list(line[:-1])))
+
+                        with open("corpus_text_taco.csv", 'a') as myinput:
+                            wr = csv.writer(myinput)
+                            wr.writerow([self.text_to_sequence(list(line[:-1]))])
+
+                            
+    def make_audio_data(self):
+        corpus_audio = []
+        audio_path = '/home/ubuntu/VCTK-Corpus/wav48/'
+        speaker_ids = ['p225', 'p226', 'p227', 'p228', 'p229', 'p996', 'p997', 'p998']
+
+        for i,ids in enumerate(speaker_ids):
+
+            audio_sorted = sorted((os.listdir(audio_path+ids)))
+            for idx, audio_file in enumerate(audio_sorted):
+                read_file = librosa.core.load(audio_path + ids + str('/') + audio_file, sr=16000, mono=True)[0]
+
+                # audio --> trim --> trim for MFCC (200) --> normalise (-1,1)  --> mu encode --> quantise --> S
+                trimmed = trim_audio(read_file, 0.03, 2048)
+                #Normalise Audio Data
+                norm_trim = trimmed[:(len(trimmed)//200)*200]
+                norm_trim = normalise_audio(norm_trim)
+
+                causal_sample = mu_encoder_np(norm_trim)
+
+                causal_sample = np.floor(causal_sample)
+                
+                s = np.abs(librosa.core.stft(y=causal_sample, n_fft=800, hop_length=200, window='hann', center=True))
+                spect = librosa.feature.melspectrogram(S=s, n_mels=80, fmax=7600, fmin=125, power=2)
+                log_compressed = librosa.core.amplitude_to_db(S=spect, ref=1.0, amin=5e-4, top_db=80.0)
+
+                filename = "tacaudio/"+"{:03d}".format(i+1)+"mfcc_{0:03d}".format(idx)
+                np.save(filename, log_compressed)
+
+
+                with open("corpus_audio_taco.csv", 'a') as myinput:
+                    wr = csv.writer(myinput)
+                    wr.writerow([filename+ '.npy'])
+                    
+def my_collate(batch):
+    data = []
+    data_len = []
+    target = []
+    target_len = []
+    ids = []
+    
+    for item in batch:
+        data.append(item[0])
+        data_len.append(item[0].shape[1])
+        target.append(item[1])
+        target_len.append(item[1].shape[1])
+        ids.append(torch.LongTensor([item[2]]).unsqueeze(0))
+    max_data = max(data_len)
+    max_tar = max(target_len)
+
+    inputs = []
+    targets = []
+    for i in range(len(data)): 
+        if data[i].size(1) < max_data:
+            inputs.append(torch.cat((data[i], (torch.zeros(max_data - data[i].size(1))).type(torch.LongTensor).unsqueeze(0)),1))
+        else:
+            inputs.append(data[i])
+            
+        if target[i].size(1) < max_tar:
+            targets.append(torch.cat((target[i], torch.ones(80, max_tar - target[i].size(1))*-45), 1))
+        else:
+            targets.append(target[i])
+
+    return torch.stack(inputs, 0), torch.stack(targets, 0), torch.stack(ids,0)
+
+
+class VCTKSets(Utils.Dataset):
+    def __init__(self):
+        self.text_input = list(pd.read_csv("corpus_text_taco.csv", header=None)[0].values)
+        self.audio_input = list(pd.read_csv("corpus_audio_taco.csv", header=None)[0].values)
+        
+        self.audio_files = []
+        self.id_files = []
+        for i in range(len(self.audio_input)): 
+            audio = torch.from_numpy(np.load(self.audio_input[i])).type(torch.FloatTensor)
+            if audio.size(1) >= 600:
+                del self.text_input[int(self.audio_input.index(self.audio_input[i]))]
+                continue
+            self.id_files.append(int(self.audio_input[i][9:12]))
+            self.audio_files.append(audio)
+        
+        self.text_files = []
+        for i in range(len(self.text_input)):
+            text = self.text_input[i][1:-1].split(', ')
+            text = [int(i) for i in text]
+            self.text_files.append(torch.LongTensor([text]))
+      
+    def __len__(self):
+        length = len(self.text_input)
+        return length
+    
+    def __getitem__(self,index):
+        # print("TEXT", self.text_files[index])
+        # print("AUDIO", self.audio_files[index])
+        return self.text_files[index], self.audio_files[index], self.id_files[index]
+
+
+def trim_audio(input_data, threshold, frame):
+    
+    #Set frame length to audio length if 
+    if input_data.size < frame:
+        frame_length_temp = input_data.size
+    else:frame_length_temp = frame
+    
+    energy = librosa.feature.rmse(y=input_data, frame_length=frame)
+    frames = np.nonzero(energy > threshold)
+    indices = librosa.core.frames_to_samples(frames)[1]
+    # Note: indices can be an empty array, if the whole audio was silence.
+    return input_data[indices[0]:indices[-1]] if indices.size else input_np[0:0]
+
+
+def normalise_audio(audio):
+    audio = audio - np.min(audio)
+    return 2*(audio/(np.max(audio)))-1
+
+
+
+
+def mu_encoder_np(input):
+    QUANT = 64
+    mu = QUANT-1
+    x_mu = np.sign(input) * np.log1p(mu * np.abs(input)) / np.log1p(mu)
+    x_mu = ((x_mu + 1) / 2 * mu + 0.5)
+    return x_mu
