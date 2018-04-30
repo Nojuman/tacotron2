@@ -1,0 +1,45 @@
+1- Create bash script:
+
+`
+#!/bin/bash
+
+source activate pytorch_source
+
+python train.py
+`
+
+2- Give permissions
+
+`
+chmod 755 train.sh
+`
+
+3- Create screen
+screen -S [name] ./[bash script]
+`
+screen -S taco_train ./train.sh
+`
+
+4- Detach screen
+`
+Ctrl-a + Ctrl-d
+`
+
+5- Check available screens
+`
+screen -list
+`
+
+6- Retach screen
+`
+screen -r taco_train
+`
+
+7- kill screen
+Check screen id
+`
+screen -list
+`
+`
+screen -X -S [id] quit
+`
