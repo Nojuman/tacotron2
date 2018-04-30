@@ -28,7 +28,7 @@ parser.add_argument('--data',
                     help='path to dataset')
 parser.add_argument('--epochs', '-e', default=50, type=int,
                     help='number of total epochs to run')
-parser.add_argument('--batch_size', '-bs', default=1, type=int, help='mini-batch size (default: 12)')
+parser.add_argument('--batch_size', '-bs', default=8, type=int, help='mini-batch size (default: 12)')
 parser.add_argument('--name', '-n', default='melnet', help='experiment name', type=str)
 parser.add_argument('--find_lr', default=False, type=bool,
                     help='runs training with LR finding scheduler,'
@@ -75,12 +75,14 @@ def train(model, optimizer, scheduler, dataset, num_epochs, batch_size=1,
     writer = SummaryWriter(f'runs/{exp_name}')
     sampler = SequentialSampler(dataset)
     batch_sampler = RandomBatchSampler(sampler, batch_size)
-    loader = DataLoader(dataset, collate_fn=my_collate, pin_memory=True, num_workers=6)
+    loader = DataLoader(dataset, batch_size=batch_size, collate_fn=my_collate, pin_memory=True, num_workers=6)
+    
     tacoteacher = TacoTeacher()
     for _ in tqdm(range(num_epochs), total=num_epochs, unit=' epochs'):
         pbar = tqdm(loader, total=len(loader), unit=' batches')
         for b, (text_batch, audio_batch, ID) in enumerate(pbar):
-
+            if step < 50000:
+                tf = np.cos((step)*np.pi/100000)
             text_lengths = text_batch.size(2)
             audio_lengths = audio_batch.size(2)
             
@@ -91,7 +93,7 @@ def train(model, optimizer, scheduler, dataset, num_epochs, batch_size=1,
             targets = Variable(audio_batch, requires_grad=False).cuda(device)
             stop_targets = make_stop_targets(targets, audio_lengths)
             tacoteacher.set_targets(targets)
-            outputs, stop_tokens, attention = model(text, tacoteacher)
+            outputs, stop_tokens, attention = model(text, tacoteacher, tf)
             spec_loss = F.mse_loss(outputs, targets)
             stop_loss = F.binary_cross_entropy_with_logits(stop_tokens, stop_targets)
             loss = spec_loss + stop_loss
@@ -105,6 +107,7 @@ def train(model, optimizer, scheduler, dataset, num_epochs, batch_size=1,
             pbar.set_description(f'loss: {loss.data[0]:.4f}')
             writer.add_scalar('loss', loss.data[0], step)
             writer.add_scalar('lr', scheduler.lr, step)
+            writer.add_scalar('tf', tf, step)
             if step % save_interval == 0:
                 torch.save(model.state_dict(), f'checkpoints/{exp_name}_{str(step)}.pt')
 
@@ -123,8 +126,13 @@ def train(model, optimizer, scheduler, dataset, num_epochs, batch_size=1,
 
 
 def main():
+    
+    if not os.path.exists("checkpoints/"):
+        os.makedirs("checkpoints/")
+        print("Created a 'checkpoints' folder to save/load the model")
+    
     args = parser.parse_args()
-    MAKE_DATA = False
+    MAKE_DATA = True
     step = 0
     exp_name = f'{args.name}_{hp.max_lr}_{hp.cycle_length}'
 

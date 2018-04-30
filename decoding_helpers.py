@@ -15,7 +15,7 @@ class TacoTeacher:
         self.targets = targets
         self.maxlen = len(targets)
 
-    def __call__(self, decoder, encoder_out):
+    def __call__(self, decoder, encoder_out, tf):
         seq1_len, batch_size, _ = encoder_out.size()
         outputs = Variable(encoder_out.data.new(self.maxlen, batch_size, decoder.num_mels))
         stop_tokens = Variable(outputs.data.new(self.maxlen, batch_size))
@@ -28,10 +28,10 @@ class TacoTeacher:
         for t in range(self.maxlen):
             output, stop_token, hidden, mask = decoder(output, encoder_out, hidden, mask)
             outputs[t] = output
-            stop_tokens[t] = stop_token
+            stop_tokens[t] = stop_token.squeeze(2).squeeze(0)
             masks[t] = mask.data
             # teacher forcing
-            if random.random() < self.teacher_forcing_ratio:
+            if random.random() < tf:
                 output = self.targets[t].unsqueeze(0)
         return outputs, stop_tokens.transpose(1, 0), masks.permute(1, 2, 0)  # batch, src, trg
 
@@ -44,7 +44,7 @@ class TacoGenerator:
     def set_maxlen(self, maxlen):
         self.maxlen = maxlen
 
-    def __call__(self, decoder, encoder_out):
+    def __call__(self, decoder, encoder_out, tf):
         seq1_len, batch_size, _ = encoder_out.size()
         if self.use_stop and batch_size > 1:
             raise ValueError('batching not supported for dynamic stopping')

@@ -21,6 +21,10 @@ import time
 import json
 import seaborn as sns
 
+if not os.path.exists("tacaudio/"):
+    os.makedirs("tacaudio/")
+    print("Created a 'tacaudio' folder to store voice data")
+
 class LJSpeechDataset(Dataset):
 
     def __init__(self, path, text_transforms=None, audio_transforms=None, cache=False, sort=True):
@@ -214,7 +218,7 @@ class make_data():
 
     def make_text_data(self):
         text_path = '/home/ubuntu/VCTK-Corpus/txt/'
-        speaker_ids = ['p225', 'p226', 'p227', 'p228', 'p229', 'p225', 'p225', 'p225']
+        speaker_ids = ['p225']
 
         for ids in speaker_ids:
 
@@ -233,7 +237,7 @@ class make_data():
     def make_audio_data(self):
         corpus_audio = []
         audio_path = '/home/ubuntu/VCTK-Corpus/wav48/'
-        speaker_ids = ['p225', 'p226', 'p227', 'p228', 'p229', 'p996', 'p997', 'p998']
+        speaker_ids = ['p997']
 
         for i,ids in enumerate(speaker_ids):
 

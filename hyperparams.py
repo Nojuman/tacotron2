@@ -5,7 +5,7 @@ chars = pad + 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz!\'\"(),-.:;?
 unk_idx = len(chars)
 
 # Audio
-sample_rate = 22050  # hz
+sample_rate = 16000  # hz
 fft_frame_size = 50.0  # ms
 fft_hop_size = 12.5  # ms
 num_mels = 80  # filters
@@ -26,7 +26,7 @@ embedding_dim = 512
 teacher_forcing_ratio = 1.0
 
 # SGDR
-cycle_length = 2000
+cycle_length = 10000
 min_lr = 1e-5
 max_lr = 1e-3
 weight_decay = 1e-6  # l2 reg

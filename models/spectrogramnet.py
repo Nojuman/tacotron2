@@ -146,7 +146,7 @@ class MelSpectrogramNet(nn.Module):
         self.encoder = Encoder(num_chars=hp.num_chars)
         self.decoder = Decoder()
 
-    def forward(self, text, decoding_helper):
+    def forward(self, text, decoding_helper, tf):
         encoder_output = self.encoder(text)
-        frames, stop_tokens, masks = decoding_helper(self.decoder, encoder_output)
+        frames, stop_tokens, masks = decoding_helper(self.decoder, encoder_output, tf)
         return frames, stop_tokens, masks
