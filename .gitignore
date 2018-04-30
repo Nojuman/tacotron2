@@ -5,3 +5,5 @@ checkpoints
 __pycache__
 runs
 tests/__pycache__
+tacaudio
+*.csv
