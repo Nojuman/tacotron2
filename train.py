@@ -104,8 +104,8 @@ def train(model, optimizer, scheduler, dataset, num_epochs, batch_size=1,
             optimizer.step()
 
             # logging
-            pbar.set_description(f'loss: {loss.data[0]:.4f}')
-            writer.add_scalar('loss', loss.data[0], step)
+            pbar.set_description(f'loss: {loss.item():.4f}')
+            writer.add_scalar('loss', loss.item(), step)
             writer.add_scalar('lr', scheduler.lr, step)
             writer.add_scalar('tf', tf, step)
             if step % save_interval == 0:
@@ -114,8 +114,7 @@ def train(model, optimizer, scheduler, dataset, num_epochs, batch_size=1,
                 # plot the first sample in the batch
                 attention_plot = show_attention(attention[0], return_array=True)
                 output_plot = show_spectrogram(outputs.data.permute(1, 2, 0)[0],
-                                               sequence_to_text(text.data[0]),
-                                               return_array=True)
+                                               sequence_to_text(text.data[0]),return_array=True)
                 target_plot = show_spectrogram(targets.data.permute(1, 2, 0)[0],
                                                sequence_to_text(text.data[0]),
                                                return_array=True)
@@ -132,7 +131,7 @@ def main():
         print("Created a 'checkpoints' folder to save/load the model")
     
     args = parser.parse_args()
-    MAKE_DATA = True
+    MAKE_DATA = False
     step = 0
     exp_name = f'{args.name}_{hp.max_lr}_{hp.cycle_length}'
 

@@ -80,7 +80,7 @@ class Encoder(nn.Module):
         self.conv1 = ConvBlock(in_channels=embedding_dim, out_channels=embedding_dim, kernel_size=5, padding=2)
         self.conv2 = ConvBlock(in_channels=embedding_dim, out_channels=embedding_dim, kernel_size=5, padding=2)
         self.conv3 = ConvBlock(in_channels=embedding_dim, out_channels=embedding_dim, kernel_size=5, padding=2)
-        self.birnn = nn.LSTM(input_size=embedding_dim, hidden_size=hidden_size, bidirectional=True, dropout=0.1) # TODO add soneout
+        self.birnn = nn.LSTM(input_size=embedding_dim, hidden_size=hidden_size, bidirectional=True) # TODO add soneout
 
     def forward(self, text):
         # input - (batch, maxseqlen) | (4, 156)
