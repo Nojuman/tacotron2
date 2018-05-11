@@ -11,6 +11,7 @@ from torch.optim import Adam
 from torch.utils.data import DataLoader
 from torch.utils.data.sampler import SequentialSampler
 from tqdm import tqdm
+tqdm.monitor_interval = 0
 
 import hyperparams as hp
 from audio import wav_to_spectrogram
@@ -26,7 +27,7 @@ parser = argparse.ArgumentParser(description='PyTorch Tacotron Spectrogram Train
 parser.add_argument('--data',
                     default='/home/ubuntu/LJSpeech-1.1',
                     help='path to dataset')
-parser.add_argument('--epochs', '-e', default=50, type=int,
+parser.add_argument('--epochs', '-e', default=5000, type=int,
                     help='number of total epochs to run')
 parser.add_argument('--batch_size', '-bs', default=8, type=int, help='mini-batch size (default: 12)')
 parser.add_argument('--name', '-n', default='melnet', help='experiment name', type=str)
@@ -34,11 +35,10 @@ parser.add_argument('--find_lr', default=False, type=bool,
                     help='runs training with LR finding scheduler,'
                          ' check tensorboard plots to choose max_lr')
 parser.add_argument('--checkpoint', '-cp', default=None, type=str, help='path to checkpoint')
-
+parser.add_argument('--mode', '-md', default="train", type=str, help='train or gen mode')
 
 
 def generate(model, dataset, batch_size=1, save_interval=50, exp_name='taco', device=1, step=0):
-    
     model.eval()
     writer = SummaryWriter(f'runs/{exp_name}')
     sampler = SequentialSampler(dataset)
@@ -67,10 +67,8 @@ def generate(model, dataset, batch_size=1, save_interval=50, exp_name='taco', de
             
             
 
-
-
 def train(model, optimizer, scheduler, dataset, num_epochs, batch_size=1,
-          save_interval=50, exp_name='taco', device=1, step=0):
+          save_interval=100, exp_name='taco', device=1, step=0):
     model.train()
     writer = SummaryWriter(f'runs/{exp_name}')
     sampler = SequentialSampler(dataset)
@@ -81,8 +79,8 @@ def train(model, optimizer, scheduler, dataset, num_epochs, batch_size=1,
     for _ in tqdm(range(num_epochs), total=num_epochs, unit=' epochs'):
         pbar = tqdm(loader, total=len(loader), unit=' batches')
         for b, (text_batch, audio_batch, ID) in enumerate(pbar):
-            if step < 50000:
-                tf = np.cos((step)*np.pi/100000)
+            if (step-50000) < 100000:
+                tf = np.cos((step-50000)*np.pi/200000)
             text_lengths = text_batch.size(2)
             audio_lengths = audio_batch.size(2)
             
@@ -114,9 +112,9 @@ def train(model, optimizer, scheduler, dataset, num_epochs, batch_size=1,
                 # plot the first sample in the batch
                 attention_plot = show_attention(attention[0], return_array=True)
                 output_plot = show_spectrogram(outputs.data.permute(1, 2, 0)[0],
-                                               sequence_to_text(text.data[0]),return_array=True)
+                                               sequence_to_text(text.data.cpu().numpy()[0]),return_array=True)
                 target_plot = show_spectrogram(targets.data.permute(1, 2, 0)[0],
-                                               sequence_to_text(text.data[0]),
+                                               sequence_to_text(text.data.cpu().numpy()[0]),
                                                return_array=True)
                 writer.add_image('attention', attention_plot, step)
                 writer.add_image('output', output_plot, step)
@@ -125,7 +123,6 @@ def train(model, optimizer, scheduler, dataset, num_epochs, batch_size=1,
 
 
 def main():
-    
     if not os.path.exists("checkpoints/"):
         os.makedirs("checkpoints/")
         print("Created a 'checkpoints' folder to save/load the model")
@@ -162,9 +159,10 @@ def main():
         scheduler = SGDRScheduler(optimizer, min_lr=hp.min_lr,
                                   max_lr=hp.max_lr, cycle_length=hp.cycle_length, current_step=step)
 
-    #generate(model, dataset, batch_size=args.batch_size, save_interval=50, exp_name=exp_name, device=10, step=step)    
-    
-    train(model, optimizer, scheduler, dataset, args.epochs, args.batch_size, save_interval=50, exp_name=exp_name, device=0, step=step)
+    if args.mode == 'gen':
+        generate(model, dataset, batch_size=args.batch_size, save_interval=50, exp_name=exp_name, device=10, step=step) 
+    else:
+        train(model, optimizer, scheduler, dataset, args.epochs, args.batch_size, save_interval=50, exp_name=exp_name, device=0, step=step)
 
 
 if __name__ == '__main__':

@@ -16,7 +16,7 @@ def show_spectrogram(spec, text=None, return_array=False):
     plt.ylabel('mels')
     plt.xlabel('frames')
     if return_array:
-        #plt.tight_layout()
+        plt.tight_layout()
         buff = io.BytesIO()
         plt.savefig(buff, format='png')
         plt.close()

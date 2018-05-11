@@ -189,8 +189,6 @@ class RandomBatchSampler:
         return len(self.random_batches)
 
 
-
-
 class make_data():
     """
     Make all the text and audio data with preprocessing
@@ -267,6 +265,7 @@ class make_data():
                     wr = csv.writer(myinput)
                     wr.writerow([filename+ '.npy'])
                     
+                    
 def my_collate(batch):
     data = []
     data_len = []
@@ -313,7 +312,6 @@ class VCTKSets(Utils.Dataset):
                 continue
             self.id_files.append(int(self.audio_input[i][9:12]))
             self.audio_files.append(audio)
-        
         self.text_files = []
         for i in range(len(self.text_input)):
             text = self.text_input[i][1:-1].split(', ')
@@ -325,13 +323,10 @@ class VCTKSets(Utils.Dataset):
         return length
     
     def __getitem__(self,index):
-        # print("TEXT", self.text_files[index])
-        # print("AUDIO", self.audio_files[index])
         return self.text_files[index], self.audio_files[index], self.id_files[index]
 
 
 def trim_audio(input_data, threshold, frame):
-    
     #Set frame length to audio length if 
     if input_data.size < frame:
         frame_length_temp = input_data.size
@@ -347,8 +342,6 @@ def trim_audio(input_data, threshold, frame):
 def normalise_audio(audio):
     audio = audio - np.min(audio)
     return 2*(audio/(np.max(audio)))-1
-
-
 
 
 def mu_encoder_np(input):
