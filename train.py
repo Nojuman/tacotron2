@@ -27,9 +27,9 @@ parser = argparse.ArgumentParser(description='PyTorch Tacotron Spectrogram Train
 parser.add_argument('--data',
                     default='/home/ubuntu/LJSpeech-1.1',
                     help='path to dataset')
-parser.add_argument('--epochs', '-e', default=5000, type=int,
+parser.add_argument('--epochs', '-e', default=500, type=int,
                     help='number of total epochs to run')
-parser.add_argument('--batch_size', '-bs', default=8, type=int, help='mini-batch size (default: 12)')
+parser.add_argument('--batch_size', '-bs', default=1, type=int, help='mini-batch size (default: 12)')
 parser.add_argument('--name', '-n', default='melnet', help='experiment name', type=str)
 parser.add_argument('--find_lr', default=False, type=bool,
                     help='runs training with LR finding scheduler,'
@@ -38,7 +38,7 @@ parser.add_argument('--checkpoint', '-cp', default=None, type=str, help='path to
 parser.add_argument('--mode', '-md', default="train", type=str, help='train or gen mode')
 
 
-def generate(model, dataset, batch_size=1, save_interval=50, exp_name='taco', device=1, step=0):
+def generate(model, dataset, batch_size=1, save_interval=100, exp_name='taco', device=1, step=0):
     model.eval()
     writer = SummaryWriter(f'runs/{exp_name}')
     sampler = SequentialSampler(dataset)
@@ -75,12 +75,13 @@ def train(model, optimizer, scheduler, dataset, num_epochs, batch_size=1,
     batch_sampler = RandomBatchSampler(sampler, batch_size)
     loader = DataLoader(dataset, batch_size=batch_size, collate_fn=my_collate, pin_memory=True, num_workers=6)
     
+    tf = 1
     tacoteacher = TacoTeacher()
     for _ in tqdm(range(num_epochs), total=num_epochs, unit=' epochs'):
         pbar = tqdm(loader, total=len(loader), unit=' batches')
         for b, (text_batch, audio_batch, ID) in enumerate(pbar):
-            if (step-50000) < 100000:
-                tf = np.cos((step-50000)*np.pi/200000)
+            if step < 100000 and step > 50000:
+                tf = np.cos(step*np.pi/200000)
             text_lengths = text_batch.size(2)
             audio_lengths = audio_batch.size(2)
             
@@ -97,7 +98,7 @@ def train(model, optimizer, scheduler, dataset, num_epochs, batch_size=1,
             loss = spec_loss + stop_loss
             optimizer.zero_grad()
             loss.backward()
-            # clip_grad_norm(model.parameters(), hp.max_grad_norm, norm_type=2)  # prevent exploding grads
+
             scheduler.step()
             optimizer.step()
 
@@ -133,15 +134,15 @@ def main():
     exp_name = f'{args.name}_{hp.max_lr}_{hp.cycle_length}'
 
     if MAKE_DATA:
+        print("Starting data generation")
         data_gen = make_data()
         data_gen.make_text_data()
+        print("Generated text data")
         data_gen.make_audio_data()
+        print("Generated audio data")
         
-    # dataset = LJSpeechDataset(path=args.data, text_transforms=text_to_sequence,
-    #                           audio_transforms=wav_to_spectrogram, cache=False)
     dataset = VCTKSets()
     model = MelSpectrogramNet()
-    
     
     if args.checkpoint:
         weights = torch.load(args.checkpoint)

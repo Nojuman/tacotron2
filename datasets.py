@@ -216,7 +216,7 @@ class make_data():
 
     def make_text_data(self):
         text_path = '/home/ubuntu/VCTK-Corpus/txt/'
-        speaker_ids = ['p225']
+        speaker_ids = ['p225','p226','p227','p228','p229','p230','p231','p232','p233','p234','p236','p237','p996','p997','p998']
 
         for ids in speaker_ids:
 
@@ -235,7 +235,7 @@ class make_data():
     def make_audio_data(self):
         corpus_audio = []
         audio_path = '/home/ubuntu/VCTK-Corpus/wav48/'
-        speaker_ids = ['p997']
+        speaker_ids = ['p225','p226','p227','p228','p229','p230','p231','p232','p233','p234','p236','p237','p996','p997','p998']
 
         for i,ids in enumerate(speaker_ids):
 
@@ -345,7 +345,7 @@ def normalise_audio(audio):
 
 
 def mu_encoder_np(input):
-    QUANT = 64
+    QUANT = 256
     mu = QUANT-1
     x_mu = np.sign(input) * np.log1p(mu * np.abs(input)) / np.log1p(mu)
     x_mu = ((x_mu + 1) / 2 * mu + 0.5)
